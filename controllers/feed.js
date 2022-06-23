@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const { validationResult } = require('express-validator');
 const Post = require('../models/post');
+const User = require('../models/user');
+
 exports.getPost = (req, res, next) => {
   const currentPage = req.query.page || 1;
   const perPage = 2;
@@ -40,19 +42,28 @@ exports.createPost = (req, res, _next) => {
   const imageUrl = req.file.path;
   const title = req.body.title;
   const content = req.body.content;
+  let creator;
   const post = new Post({
     title,
     content,
     imageUrl,
-    creator: { name: 'David Duarte' },
+    creator: req.userId,
   });
   post
     .save()
+    .then(() => {
+      return User.findById(req.userId);
+    })
+    .then(user => {
+      creator = user;
+      user.posts.push(post);
+      return user.save();
+    })
     .then(result => {
-      console.log('result :>> ', result);
       res.status(200).json({
         message: 'post create successfully',
-        post: result,
+        post,
+        creator: { _id: creator._id, name: creator.name },
       });
     })
     .catch(err => {
@@ -108,6 +119,11 @@ exports.updatedPost = (req, res, next) => {
         error.statusCode = 404;
         throw error;
       }
+      if (post.creator.toString() !== req.userId) {
+        const error = new Error('No Auth');
+        error.statusCode = 403;
+        throw error;
+      }
       if (imageUrl !== post.imageUrl) {
         clearImage(post.imageUrl);
       }
@@ -138,11 +154,22 @@ exports.deletePost = (req, res, next) => {
         error.statusCode = 404;
         throw error;
       }
+      if (post.creator.toString() !== req.userId) {
+        const error = new Error('No Authorized');
+        error.statusCode = 403;
+        throw error;
+      }
       clearImage(post.imageUrl);
       return Post.findByIdAndDelete(postId);
     })
     .then(result => {
-      console.log(result);
+      return User.findById(req.userId);
+    })
+    .then(user => {
+      user.posts.pull(postId);
+      return user.save();
+    })
+    .then(result => {
       res.status(200).json({ message: 'Deleted post.' });
     })
     .catch(err => {
