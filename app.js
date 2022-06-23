@@ -4,6 +4,7 @@ const path = require('path');
 const multer = require('multer');
 const bodyParser = require('body-parser');
 const feedRoutes = require('./routes/feed');
+const authRoutes = require('./routes/auth');
 const app = express();
 const port = process.env.PORT || 8080;
 const MONGODB_URI =
@@ -42,11 +43,13 @@ app.use((_req, res, next) => {
   next();
 });
 app.use('/feed', feedRoutes);
+app.use('/auth', authRoutes);
 app.use((error, _req, res, _next) => {
   console.log(error);
   const status = error.statusCode || 500;
   const message = error.message;
-  res.status(status).json({ message });
+  const data = error.data;
+  res.status(status).json({ message, data });
 });
 mongoose
   .connect(MONGODB_URI)
