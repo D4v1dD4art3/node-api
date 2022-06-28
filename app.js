@@ -45,8 +45,10 @@ app.use((_req, res, next) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   next();
 });
+
 app.use('/feed', feedRoutes);
 app.use('/auth', authRoutes);
+
 app.use((error, _req, res, _next) => {
   console.log(error);
   const status = error.statusCode || 500;
@@ -54,12 +56,15 @@ app.use((error, _req, res, _next) => {
   const data = error.data;
   res.status(status).json({ message, data });
 });
+
 mongoose
   .connect(MONGODB_URI)
   .then(() => {
-    app.listen(port, () =>
-      console.log(`listening on http://localhost:${port}`),
-    );
+    const server = app.listen(port);
+    const io = require('./socket').init(server);
+    io.on('connection', socket => {
+      console.log('client Connected');
+    });
   })
   .catch(err => {
     console.log(err);
