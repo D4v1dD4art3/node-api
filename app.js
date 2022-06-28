@@ -3,8 +3,9 @@ const mongoose = require('mongoose');
 const path = require('path');
 const multer = require('multer');
 const bodyParser = require('body-parser');
-const feedRoutes = require('./routes/feed');
-const authRoutes = require('./routes/auth');
+const { graphqlHTTP } = require('express-graphql');
+const graphqlSchema = require('./graphql/schema');
+const graphqlResolvers = require('./graphql/resolvers');
 const app = express();
 const port = process.env.PORT || 8080;
 const MONGODB_URI =
@@ -46,8 +47,13 @@ app.use((_req, res, next) => {
   next();
 });
 
-app.use('/feed', feedRoutes);
-app.use('/auth', authRoutes);
+app.use(
+  '/graphql',
+  graphqlHTTP({
+    schema: graphqlSchema,
+    rootValue: graphqlResolvers,
+  }),
+);
 
 app.use((error, _req, res, _next) => {
   console.log(error);
@@ -60,11 +66,7 @@ app.use((error, _req, res, _next) => {
 mongoose
   .connect(MONGODB_URI)
   .then(() => {
-    const server = app.listen(port);
-    const io = require('./socket').init(server);
-    io.on('connection', socket => {
-      console.log('client Connected');
-    });
+    app.listen(port);
   })
   .catch(err => {
     console.log(err);
