@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const mongoose = require('mongoose');
 const path = require('path');
 const multer = require('multer');
@@ -6,6 +7,7 @@ const bodyParser = require('body-parser');
 const { graphqlHTTP } = require('express-graphql');
 const graphqlSchema = require('./graphql/schema');
 const graphqlResolvers = require('./graphql/resolvers');
+const auth = require('./middleware/auth');
 const app = express();
 const port = process.env.PORT || 8080;
 const MONGODB_URI =
@@ -50,13 +52,29 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(auth);
+app.put('/post-image', (req, res, next) => {
+  if (!req.isAuth) {
+    throw new Error('not authenticate');
+  }
+  if (!req.file) {
+    return res.status(200).json({ message: 'No File provided!' });
+  }
+  if (req.body.oldPath) {
+    clearImage(req.body.oldPath);
+  }
+  return res
+    .status(201)
+    .json({ message: 'file stores.', filePath: req.file.path });
+});
+
 app.use(
   '/graphql',
   graphqlHTTP({
     schema: graphqlSchema,
     rootValue: graphqlResolvers,
     graphiql: true,
-    formatError(err) {
+    customFormatErrorFn(err) {
       if (!err.originalError) {
         return err;
       }
@@ -88,3 +106,8 @@ mongoose
   .catch(err => {
     console.log(err);
   });
+
+const clearImage = filePath => {
+  filePath = path.join(__dirname, '..', filePath);
+  fs.unlink(filePath, err => console.log(err));
+};
